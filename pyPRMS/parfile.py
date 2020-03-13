@@ -23,8 +23,8 @@ class ParameterFile(object):
         self.__isloaded = False
         self.__updated_params = set()
         self.__verbose = verbose
-        self.__parameters = ParameterDict()
-        self.__dimensions = DimensionDict()
+        self.__parameters = ParameterDict(verify=verify)
+        self.__dimensions = DimensionDict(verbose=verbose)
         self.filename = filename
 
     @property

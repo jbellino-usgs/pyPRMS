@@ -1,3 +1,4 @@
+import abc
 from collections import OrderedDict
 
 
@@ -46,3 +47,16 @@ class PrmsDict(OrderedDict):
                             pass a list or dict-like object.')
 
         return
+
+    @abc.abstractmethod
+    def add(self, name):
+        raise NotImplementedError(
+            'must define check in child '
+            'class to use this base class')
+
+    @abc.abstractmethod
+    def exists(self, name):
+        raise NotImplementedError(
+            'must define check in child '
+            'class to use this base class')
+

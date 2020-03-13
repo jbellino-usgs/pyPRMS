@@ -260,7 +260,11 @@ class DimensionDict(PrmsDict):
                 if name not in ['nmonths', 'ndays', 'one']:
                     # NOTE: This will always try to grow a dimension if it
                     # already exists!
-                    self.__dict__[name].size += size
+                    newsize = self.__getitem__(name).size + size
+                    self.__setitem__(name, Dimension(name=name,
+                                                     size=newsize))
+                    self.__dict__[name] = Dimension(name=name,
+                                                    size=newsize)
 
     def exists(self, name):
         """Check if dimension exists.
@@ -307,3 +311,118 @@ class DimensionDict(PrmsDict):
         for kk, vv in iter(self.items()):
             dims[kk] = {'size': vv.size}
         return dims
+
+
+class ParamDimensions(DimensionDict):
+    """Container for parameter dimensions.
+
+    This object adds tracking of dimension position.
+    """
+
+    @property
+    def xml(self):
+        """Get xml for the dimensions.
+
+        :returns: XML element of the dimensions
+        :rtype: xmlET.Element
+        """
+
+        # <dimensions>
+        #     <dimension name = "nsegment" position = "1" size = "1434" />
+        # </ dimensions>
+        dims_xml = xmlET.Element('dimensions')
+
+        for kk, vv in iter(self.items()):
+            dim_sub = xmlET.SubElement(dims_xml, 'dimension')
+            dim_sub.set('name', kk)
+            xmlET.SubElement(dim_sub, 'position').text = str(self.get_position(kk)+1)
+            xmlET.SubElement(dim_sub, 'size').text = str(vv.size)
+
+            # dim_sub.set('position', str(self.get_position(kk)+1))
+            # dim_sub.set('size', str(vv.size))
+        return dims_xml
+
+    def add_from_xml(self, filename):
+        """Add one or more dimensions from an xml file.
+
+        Add or grow dimensions from XML information. This version also checks dimension position.
+
+        :param str filename: name of the xml file
+
+        :raises ValueError: if existing dimension position is altered
+        """
+
+        # Add dimensions and grow dimension sizes from xml information for a parameter
+        # This information is found in xml files for each region for each parameter
+        # No attempt is made to verify whether each region for a given parameter
+        # has the same or same number of dimensions.
+        xml_root = read_xml(filename)
+
+        for cdim in xml_root.findall('./dimensions/dimension'):
+            name = cdim.get('name')
+            size = int(cdim.get('size'))
+            pos = int(cdim.get('position')) - 1
+
+            if name not in self.keys():
+                try:
+                    self.__setitem__(name, Dimension(name=name, size=size))
+                    self.__dict__[name] = Dimension(name=name, size=size)
+                except ValueError as err:
+                    print(err)
+            else:
+                curr_pos = list(self.keys()).index(name)
+
+                if curr_pos != pos:
+                    # This indicates a problem in one of the paramdb files
+                    raise ValueError('{}: Attempted position change from {} to {}'.format(name, curr_pos, pos))
+                else:
+                    if name not in ['nmonths', 'ndays', 'one']:
+                        # NOTE: This will always try to grow a dimension if it already exists!
+                        newsize = self.__getitem__(name).size + size
+                        self.__setitem__(name, Dimension(name=name,
+                                                         size=newsize))
+                        self.__dict__[name] = Dimension(name=name,
+                                                        size=newsize)
+
+    # noinspection PyUnresolvedReferences
+    def get_dimsize_by_index(self, index):
+        """Return size of dimension at the given index.
+
+        :param int index: The 0-based position of the dimension.
+        :returns: Size of the dimension.
+        :rtype: int
+        :raises ValueError: if index is greater than number dimensions for the parameter
+        """
+
+        if index < len(self.items()):
+            try:
+                # Python 2.7.x
+                return self.items()[index][1].size
+            except TypeError:
+                # Python 3.x
+                return list(self.items())[index][1].size
+        raise ValueError('Parameter has no dimension at index {}'.format(index))
+
+    def get_position(self, name):
+        """Get 0-based index position of a dimension.
+
+        :param str name: name of the dimension
+
+        :returns: index position of dimension
+        :rtype: int
+        """
+
+        # TODO: method name should be index() ??
+        return list(self.keys()).index(name)
+
+    def tostructure(self):
+        """Get dictionary structure of the dimensions.
+
+        :returns: dictionary of Dimensions names, sizes, and positions
+        :rtype: dict
+        """
+
+        ldims = super(ParamDimensions, self).tostructure()
+        for kk, vv in iter(ldims.items()):
+            vv['position'] = self.get_position(kk)
+        return ldims

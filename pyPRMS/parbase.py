@@ -1,15 +1,15 @@
-import functools
+import io
+import pkgutil
 import numpy as np
 import pandas as pd
 from collections import OrderedDict
 import xml.etree.ElementTree as xmlET
 
 from .Exceptions_custom import ParameterError, ConcatError
-from .constants import DATA_TYPES
-from .Dimensions import ParamDimensions
+from .constants import DATA_TYPES, NHM_DATATYPES
+from .dimbase import ParamDimensions
 
 from .util_dict import PrmsDict
-from .ValidParams import ValidParams
 
 
 class Parameter(object):
@@ -362,7 +362,7 @@ class Parameter(object):
 
             # Convert list to np.array
             if self.ndims == 2:
-                data_np = np.array(data_in).reshape((-1, self.dimensions.get_dimsize_by_index(1),), order='F')
+                data_np = np.array(data_in).reshape((-1, self.__dimensions.get_dimsize_by_index(1),), order='F')
                 # data_np = np.array(data_in).reshape((-1, self.__dimensions.get_dimsize_by_index(1),), order='F')
             elif self.ndims == 1:
                 data_np = np.array(data_in)
@@ -372,7 +372,7 @@ class Parameter(object):
             # Replace data
             # self.__data = data_np
 
-            if 'one' in self.__dimensions.dimensions.keys():
+            if 'one' in self.__dimensions.keys():
                 # A parameter with the dimension 'one' should never have more
                 # than 1 value. Output warning if the incoming value is different
                 # from a pre-existing value
@@ -986,3 +986,222 @@ class ParameterDict(PrmsDict):
 
             # Need to reduce the snarea_curve array to match the number of indices in hru_deplcrv
             # new_deplcrv = pp['hru_deplcrv'].data.tolist()
+
+
+class ValidParams(PrmsDict):
+
+    """Object containing master list of parameters."""
+
+    # Author: Parker Norton (pnorton@usgs.gov)
+    # Create date: 2019-04
+
+    def __init__(self, filename=None):
+        """Create ValidParams object.
+
+        Read an XML file of parameters to use as a master of valid PRMS
+        parameters. If no filename is specified an internal library XML file
+        is read.
+
+        :param filename: name of XML parameter file
+        :type filename: str or None
+        """
+        super(ValidParams, self).__init__()
+        print('Initializing valid parameters')
+
+        self.__filename = filename
+
+        if filename:
+            self.__xml_tree = xmlET.parse(self.__filename)
+        else:
+            # Use the package file, parameters.xml, by default
+            xml_fh = io.StringIO(
+                pkgutil.get_data('pyPRMS',
+                                 'xml/parameters.xml').decode('utf-8'))
+            self.__xml_tree = xmlET.parse(xml_fh)
+
+        # TODO: need more robust logic here; currently no way to handle
+        #  failures
+        self.__isloaded = False
+        print('Reading xml')
+        self._read()
+        self.__isloaded = True
+        print('Initialization complete')
+
+    @property
+    def filename(self):
+        """Get XML filename.
+
+        Returned filename is None if reading from the library-internal XML
+        file.
+
+        :returns: name of XML file
+        :rtype: str or None
+        """
+
+        return self.__filename
+
+    @filename.setter
+    def filename(self, filename=None):
+        """Set the XML file name.
+
+        If no filename is specified an library-internal XML file is read.
+
+        :param filename: name of XML parameter file
+        :type filename: str or None
+        """
+
+        self.__filename = filename
+
+        if filename is not None:
+            self.__xml_tree = xmlET.parse(self.__filename)
+        else:
+            # Use the package parameters.xml by default
+            xml_fh = io.StringIO(
+                pkgutil.get_data('pyPRMS',
+                                 'xml/parameters.xml').decode('utf-8'))
+            self.__xml_tree = xmlET.parse(xml_fh)
+
+        self.__isloaded = False
+        self._read()
+        self.__isloaded = True
+
+    def add(self, name, datatype=None, units=None, model=None, description=None,
+            help=None, modules=None, minimum=None, maximum=None, default=None,
+            info=None):
+        """Add a new parameter by name.
+
+        :param str name: A valid PRMS parameter name
+        :param int datatype: The datatype for the parameter (1-Integer, 2-Float, 3-Double, 4-String)
+        :param str units: Option units string for the parameter
+        :param str model: <<FILL IN LATER>>
+        :param str description: Description of the parameter
+        :param str help: Help text for the parameter
+        :param modules: List of modules that require the parameter
+        :type modules: list[str] or None
+        :param minimum: Minimum value allowed in the parameter data
+        :type minimum: int or float or None
+        :param maximum: Maximum value allowed in the parameter data
+        :type maximum: int or float or None
+        :param default: Default value used for parameter data
+        :type default: int or float or None
+        :param info: Parameter object containing the metadata information for the parameter
+        :type info: Parameter
+
+        :raises ParameterError: if parameter already exists or name is None
+        """
+
+        # Add a new parameter
+        if self.exists(name):
+            raise ParameterError("Parameter already exists")
+        elif name is None:
+            raise ParameterError("None is not a valid parameter name")
+
+        if isinstance(info, Parameter):
+            param = Parameter(name=name,
+                              datatype=info.datatype,
+                              units=info.units,
+                              model=info.model,
+                              description=info.description,
+                              help=info.help,
+                              modules=info.modules,
+                              minimum=info.minimum,
+                              maximum=info.maximum,
+                              default=info.default)
+        else:
+            param = Parameter(name=name,
+                              datatype=datatype,
+                              units=units,
+                              model=model,
+                              description=description,
+                              help=help,
+                              modules=modules,
+                              minimum=minimum,
+                              maximum=maximum,
+                              default=default)
+
+        self.__setitem__(name, param)
+        self.__dict__[name] = param
+
+    def exists(self, name):
+        """Checks if a given parameter name exists.
+
+        :param str name: Name of the parameter
+        :returns: True if parameter exists, otherwise False
+        :rtype: bool
+        """
+
+        return name in self.keys()
+
+    def get_params_for_modules(self, modules):
+        """Get list of unique parameters required for a given list of modules.
+
+        :param list[str] modules: list of PRMS modules
+
+        :returns: set of parameter names
+        :rtype: set[str]
+        """
+
+        params_by_module = []
+
+        for xx in self.values():
+            for mm in xx.modules:
+                if mm in modules:
+                    params_by_module.append(xx.name)
+        return set(params_by_module)
+
+    def _read(self):
+        """Read an XML parameter file.
+
+        The resulting Parameters object will have parameters that have no data.
+        """
+
+        xml_root = self.__xml_tree.getroot()
+
+        # Iterate over child nodes of root
+        for elem in xml_root.findall('parameter'):
+            # print(elem.attrib.get('name'))
+            name = elem.attrib.get('name')
+            dtype = elem.find('type').text
+            # print(name)
+            try:
+                self.add(name)
+
+                self.__getitem__(name).datatype = NHM_DATATYPES[dtype]
+                self.__getitem__(name).description = elem.find('desc').text
+                self.__getitem__(name).units = elem.find('units').text
+
+                try:
+                    self.__getitem__(name).minimum = elem.find('minimum').text
+                except AttributeError:
+                    pass
+
+                try:
+                    self.__getitem__(name).maximum = elem.find('maximum').text
+                except AttributeError:
+                    pass
+
+                try:
+                    self.__getitem__(name).default = elem.find('default').text
+                except AttributeError:
+                    # Parameter has no default value
+                    pass
+
+                # Add dimensions for current parameter
+                for cdim in elem.findall('./dimensions/dimension'):
+                    try:
+                        self.__getitem__(name).dimensions.add(
+                            cdim.attrib.get('name'),
+                            size=int(cdim.find('default').text))
+                    except AttributeError:
+                        # Dimension has no default value
+                        self.__getitem__(name).\
+                            dimensions.add(cdim.attrib.get('name'))
+
+                mods = []
+                for cmod in elem.findall('./modules/module'):
+                    mods.append(cmod.text)
+
+                self.__getitem__(name).modules = mods
+            except ParameterError:
+                # Parameter exists add any new attribute information
+                pass
