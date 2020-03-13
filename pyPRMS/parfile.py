@@ -175,14 +175,18 @@ class ParameterFile(object):
             #     except KeyError:
             #         print('WARNING: {} has no master information'.format(varname))
 
-            # Add the dimensions to the parameter, dimension size is looked up from the global Dimensions object
+            # Add the dimensions to the parameter, dimension size is looked up
+            # from the global Dimensions object
             for dd in dim_tmp:
-                self.parameters.get(varname).dimensions.add(dd, self.dimensions.get(dd).size)
+                self.parameters.get(varname).dimensions.\
+                    add(dd, self.dimensions.get(dd).size)
 
             if numval != dim_size:
-                # The declared total size doesn't match the total size of the declared dimensions
-                print('{}: Declared total size for parameter does not match the total size of the ' +
-                      'declared dimension(s) ({} != {}).. skipping'.format(varname, numval, dim_size))
+                # The declared total size doesn't match the total size of the
+                # declared dimensions
+                print(f'{varname}: Declared total size for parameter does not '
+                      f'match the total size of the declared dimension(s) '
+                      f'({numval} != {dim_size}).. skipping')
 
                 # Still have to read all the values to skip this properly
                 try:
@@ -194,9 +198,10 @@ class ParameterFile(object):
                 except StopIteration:
                     # Hit the end of the file
                     pass
-                self.parameters.del_param(varname)
+                self.__parameters.__delitem__(varname)
             else:
-                # Check if number of values written match the number of values declared
+                # Check if number of values written match the number of values
+                # declared
                 vals = []
                 try:
                     # Read in the data values

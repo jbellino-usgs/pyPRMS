@@ -690,7 +690,7 @@ class ParameterDict(PrmsDict):
 
     Example
     -------
-    >>> from pyPRMS.pfile import ParameterFile
+    >>> from pyPRMS.parfile import ParameterFile
     >>> pf = ParameterFile('param.param')
     >>> pf.parameters['hru_slope']
     >>> pf.parameters.hru_slope.data[:20]
