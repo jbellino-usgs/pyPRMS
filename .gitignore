@@ -1,1 +1,36 @@
-.idea
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyBuilder
+.idea/
+
+# ignore all .ipynb_checkpoints
+.ipynb_checkpoints
+
+# ignore batch files
+*.bat
+
+# ignore text files
+*.txt
+
+# ignore other types
+*.lnk
+*.log
