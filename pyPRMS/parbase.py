@@ -109,12 +109,15 @@ class Parameter(object):
     def as_dataframe(self):
         """Returns the parameter data as a pandas DataFrame."""
 
+        idx = pd.Index(list(range(1, len(self.data) + 1)), name='hru_reg_id')
         if len(self.data.shape) == 2:
-            df = pd.DataFrame(self.data)
-            df.rename(columns=lambda xx: '{}_{}'.format(self.name, df.columns.get_loc(xx) + 1), inplace=True)
+            df = pd.DataFrame(self.data, index=idx)
+            df.rename(columns=lambda xx: '{}_{}'.format(self.name,
+                                                        df.columns.get_loc(xx)
+                                                        + 1), inplace=True)
         else:
             # Assuming 1D array
-            df = pd.DataFrame(self.data, columns=[self.name])
+            df = pd.DataFrame(self.data, columns=[self.name], index=idx)
             # df.rename(columns={0: name}, inplace=True)
 
         return df
